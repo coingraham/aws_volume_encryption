@@ -12,33 +12,25 @@ Conditions:
     Use named profiles from credentials file
 """
 
-import sys
 import boto3
 import botocore
 import argparse
+import root_drive_encrypter_config
+from multiprocessing import Pool
 
 
-def main(argv):
-    parser = argparse.ArgumentParser(description='Encrypts EC2 root volume.')
-    parser.add_argument('-i', '--instance',
-                        help='Instance to encrypt volume on.', required=True)
-    parser.add_argument('-key', '--customer_master_key',
-                        help='Customer master key', required=False)
-    parser.add_argument('-p', '--profile',
-                        help='Profile to use', required=False)
-    args = parser.parse_args()
+def encrypt_root(name):
 
     """ Set up AWS Session + Client + Resources + Waiters """
-    if args.profile:
-        # Create custom session
-        print('Using profile {}'.format(args.profile))
-        session = boto3.session.Session(profile_name=args.profile)
-    else:
-        # Use default session
-        session = boto3.session.Session()
+    profile = process_system_config.profile
+
+    # Create custom session
+    print('Using profile {}'.format(profile))
+    session = boto3.session.Session(profile_name=profile)
+
 
     # Get CMK
-    customer_master_key = args.customer_master_key
+    customer_master_key = process_system_config.customer_master_key
 
     client = session.client('ec2')
     ec2 = session.resource('ec2')
@@ -49,8 +41,23 @@ def main(argv):
     waiter_snapshot_complete = client.get_waiter('snapshot_completed')
     waiter_volume_available = client.get_waiter('volume_available')
 
+    """ Get Instance Id from Name Tag """
+    name_filter = [{
+        'Name': 'tag:Name',
+        'Values': [name]
+    }]
+
+    try:
+        reservations = client.describe_instances(Filters=name_filter)
+
+        if len(reservations[u'Reservations'][0][u'Instances']) == 1:
+            instance_id = reservations[u'Reservations'][0][u'Instances'][0][u'InstanceId']
+        else:
+            return 'ERROR: Ambiguous name{}'.format(name)
+    except:
+        return 'ERROR: Ambiguous name {}'.format(name)
+
     """ Check instance exists """
-    instance_id = args.instance
     print('---Checking instance ({})'.format(instance_id))
     instance = ec2.Instance(instance_id)
 
@@ -61,7 +68,7 @@ def main(argv):
             ]
         )
     except botocore.exceptions.WaiterError as e:
-        sys.exit('ERROR: {}'.format(e))
+        return 'ERROR: {}'.format(e)
 
     """ Get volume and exit if already encrypted """
     volumes = [v for v in instance.volumes.all()]
@@ -69,9 +76,7 @@ def main(argv):
         original_root_volume = volumes[0]
         volume_encrypted = original_root_volume.encrypted
         if volume_encrypted:
-            sys.exit(
-                '**Volume ({}) is already encrypted'
-                .format(original_root_volume.id))
+            return '**Volume ({}) is already encrypted'.format(original_root_volume.id)
 
     """ Step 1: Prepare instance """
     print('---Preparing instance')
@@ -82,10 +87,7 @@ def main(argv):
     # Exit if instance is pending, shutting-down, or terminated
     instance_exit_states = [0, 32, 48]
     if instance.state['Code'] in instance_exit_states:
-        sys.exit(
-            'ERROR: Instance is {} please make sure this instance is active.'
-            .format(instance.state['Name'])
-        )
+        return 'ERROR: Instance is {} please make sure this instance is active.'.format(instance.state['Name'])
 
     # Validate successful shutdown if it is running or stopping
     if instance.state['Code'] is 16:
@@ -101,7 +103,7 @@ def main(argv):
             ]
         )
     except botocore.exceptions.WaiterError as e:
-        sys.exit('ERROR: {}'.format(e))
+        return 'ERROR: {}'.format(e)
 
     """ Step 2: Take snapshot of volume """
     print('---Create snapshot of volume ({})'.format(original_root_volume.id))
@@ -118,7 +120,7 @@ def main(argv):
         )
     except botocore.exceptions.WaiterError as e:
         snapshot.delete()
-        sys.exit('ERROR: {}'.format(e))
+        return 'ERROR: {}'.format(e)
 
     """ Step 3: Create encrypted volume """
     print('---Create encrypted copy of snapshot')
@@ -151,7 +153,7 @@ def main(argv):
     except botocore.exceptions.WaiterError as e:
         snapshot.delete()
         snapshot_encrypted.delete()
-        sys.exit('ERROR: {}'.format(e))
+        return 'ERROR: {}'.format(e)
 
     print('---Create encrypted volume from snapshot')
     volume_encrypted = ec2.create_volume(
@@ -178,7 +180,7 @@ def main(argv):
         snapshot.delete()
         snapshot_encrypted.delete()
         volume_encrypted.delete()
-        sys.exit('ERROR: {}'.format(e))
+        return 'ERROR: {}'.format(e)
 
     instance.attach_volume(
         VolumeId=volume_encrypted.id,
@@ -208,7 +210,7 @@ def main(argv):
             ]
         )
     except botocore.exceptions.WaiterError as e:
-        sys.exit('ERROR: {}'.format(e))
+        return 'ERROR: {}'.format(e)
 
     """ Step 7: Clean up """
     print('---Clean up resources')
@@ -220,4 +222,9 @@ def main(argv):
     print('Encryption finished')
 
 if __name__ == "__main__":
-    main(sys.argv[1:])
+
+    # Get the list of instance names from the config file.
+    names = root_drive_encrypter_config.names
+
+    p = Pool(3)
+    print(p.map(encrypt_root, names))
