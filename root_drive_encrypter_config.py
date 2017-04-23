@@ -10,6 +10,7 @@ region = "us-east-1"  # for local testing
 
 # Comma delimited array of quoted instance names to encrypt the root drive.
 names = ["Test1","Test2","ipcapture","LinuxForCoin"]
+# names = ["Test"]
 
 # Customer Master Key to use if you're not using the default AWS key
 customer_master_key = ""

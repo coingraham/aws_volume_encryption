@@ -22,7 +22,7 @@ from multiprocessing import Pool
 def encrypt_root(name):
 
     """ Set up AWS Session + Client + Resources + Waiters """
-    profile = process_system_config.profile
+    profile = root_drive_encrypter_config.profile
 
     # Create custom session
     # print('Using profile {}'.format(profile))
@@ -30,7 +30,7 @@ def encrypt_root(name):
 
 
     # Get CMK
-    customer_master_key = process_system_config.customer_master_key
+    customer_master_key = root_drive_encrypter_config.customer_master_key
 
     client = session.client('ec2')
     ec2 = session.resource('ec2')
@@ -221,7 +221,7 @@ def encrypt_root(name):
     snapshot_encrypted.delete()
     original_root_volume.delete()
 
-    print('Encryption finished')
+    print('Encryption finished for {}'.format(name))
 
 if __name__ == "__main__":
 
@@ -229,10 +229,9 @@ if __name__ == "__main__":
     names = root_drive_encrypter_config.names
 
     # Make sure there are names in the list and run a process for each.
-    try:
-        if len(names) > 0:
-            p = Pool(len(names))
-            print(p.map(encrypt_root, names))
-    except:
-        return '---Missing names in the configuration file'
+    if len(names) > 0:
+        p = Pool(len(names))
+        print(p.map(encrypt_root, names))
+    else:
+        print('---Missing list of instnance names in config')
 
