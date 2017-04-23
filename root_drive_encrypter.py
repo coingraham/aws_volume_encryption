@@ -25,7 +25,7 @@ def encrypt_root(name):
     profile = process_system_config.profile
 
     # Create custom session
-    print('Using profile {}'.format(profile))
+    # print('Using profile {}'.format(profile))
     session = boto3.session.Session(profile_name=profile)
 
 
@@ -53,12 +53,12 @@ def encrypt_root(name):
         if len(reservations[u'Reservations'][0][u'Instances']) == 1:
             instance_id = reservations[u'Reservations'][0][u'Instances'][0][u'InstanceId']
         else:
-            return 'ERROR: Ambiguous name{}'.format(name)
+            return 'ERROR: Ambiguous name {}'.format(name)
     except:
         return 'ERROR: Ambiguous name {}'.format(name)
 
     """ Check instance exists """
-    print('---Checking instance ({})'.format(instance_id))
+    print('---Checking instance ({}) for {}'.format(instance_id, name))
     instance = ec2.Instance(instance_id)
 
     try:
@@ -68,7 +68,7 @@ def encrypt_root(name):
             ]
         )
     except botocore.exceptions.WaiterError as e:
-        return 'ERROR: {}'.format(e)
+        return 'ERROR: {} on {}'.format(e, name)
 
     """ Get volume and exit if already encrypted """
     volumes = [v for v in instance.volumes.all()]
@@ -76,10 +76,10 @@ def encrypt_root(name):
         original_root_volume = volumes[0]
         volume_encrypted = original_root_volume.encrypted
         if volume_encrypted:
-            return '**Volume ({}) is already encrypted'.format(original_root_volume.id)
+            return '**Volume ({}) is already encrypted on {}'.format(original_root_volume.id, name)
 
     """ Step 1: Prepare instance """
-    print('---Preparing instance')
+    print('---Preparing instance {}'.format(name))
     # Save original mappings to persist to new volume
     original_mappings = {}
     original_mappings['DeleteOnTermination'] = instance.block_device_mappings[0]['Ebs']['DeleteOnTermination']
@@ -87,7 +87,7 @@ def encrypt_root(name):
     # Exit if instance is pending, shutting-down, or terminated
     instance_exit_states = [0, 32, 48]
     if instance.state['Code'] in instance_exit_states:
-        return 'ERROR: Instance is {} please make sure this instance is active.'.format(instance.state['Name'])
+        return 'ERROR: Instance is {} please make sure this instance ({}) is active.'.format(instance.state['Name'], name)
 
     # Validate successful shutdown if it is running or stopping
     if instance.state['Code'] is 16:
@@ -103,13 +103,14 @@ def encrypt_root(name):
             ]
         )
     except botocore.exceptions.WaiterError as e:
-        return 'ERROR: {}'.format(e)
+        return 'ERROR: {} on {}'.format(e, name)
 
     """ Step 2: Take snapshot of volume """
-    print('---Create snapshot of volume ({})'.format(original_root_volume.id))
+    print('---Create snapshot of volume ({}) for {}'.format(original_root_volume.id, name))
+
     snapshot = ec2.create_snapshot(
         VolumeId=original_root_volume.id,
-        Description='Snapshot of volume ({})'.format(original_root_volume.id),
+        Description='Snapshot of volume ({}) for {}'.format(original_root_volume.id, name),
     )
 
     try:
@@ -120,16 +121,17 @@ def encrypt_root(name):
         )
     except botocore.exceptions.WaiterError as e:
         snapshot.delete()
-        return 'ERROR: {}'.format(e)
+        return 'ERROR: {} on {}'.format(e, name)
 
     """ Step 3: Create encrypted volume """
-    print('---Create encrypted copy of snapshot')
+    print('---Create encrypted copy of snapshot for {}'.format(name))
+
     if customer_master_key:
         # Use custom key
         snapshot_encrypted_dict = snapshot.copy(
             SourceRegion=session.region_name,
-            Description='Encrypted copy of snapshot #{}'
-                        .format(snapshot.id),
+            Description='Encrypted copy of snapshot ({}) for {}'
+                        .format(snapshot.id, name),
             KmsKeyId=customer_master_key,
             Encrypted=True,
         )
@@ -137,8 +139,8 @@ def encrypt_root(name):
         # Use default key
         snapshot_encrypted_dict = snapshot.copy(
             SourceRegion=session.region_name,
-            Description='Encrypted copy of snapshot ({})'
-                        .format(snapshot.id),
+            Description='Encrypted copy of snapshot ({}) for {}'
+                        .format(snapshot.id, name),
             Encrypted=True,
         )
 
@@ -153,23 +155,23 @@ def encrypt_root(name):
     except botocore.exceptions.WaiterError as e:
         snapshot.delete()
         snapshot_encrypted.delete()
-        return 'ERROR: {}'.format(e)
+        return 'ERROR: {} on {}'.format(e, name)
 
-    print('---Create encrypted volume from snapshot')
+    print('---Create encrypted volume from snapshot for {}'.format(name))
     volume_encrypted = ec2.create_volume(
         SnapshotId=snapshot_encrypted.id,
         AvailabilityZone=instance.placement['AvailabilityZone']
     )
 
     """ Step 4: Detach current root volume """
-    print('---Deatch volume {}'.format(original_root_volume.id))
+    print('---Deatch volume {} for {}'.format(original_root_volume.id, name))
     instance.detach_volume(
         VolumeId=original_root_volume.id,
         Device=instance.root_device_name,
     )
 
     """ Step 5: Attach current root volume """
-    print('---Attach volume {}'.format(volume_encrypted.id))
+    print('---Attach volume {} for {}'.format(volume_encrypted.id, name))
     try:
         waiter_volume_available.wait(
             VolumeIds=[
@@ -180,7 +182,7 @@ def encrypt_root(name):
         snapshot.delete()
         snapshot_encrypted.delete()
         volume_encrypted.delete()
-        return 'ERROR: {}'.format(e)
+        return 'ERROR: {} on {}'.format(e, name)
 
     instance.attach_volume(
         VolumeId=volume_encrypted.id,
@@ -200,7 +202,7 @@ def encrypt_root(name):
             },
         ],
     )
-    print('---Restart instance')
+    print('---Restart instance {}'.format(name))
     instance.start()
 
     try:
@@ -210,10 +212,10 @@ def encrypt_root(name):
             ]
         )
     except botocore.exceptions.WaiterError as e:
-        return 'ERROR: {}'.format(e)
+        return 'ERROR: {} on {}'.format(e, name)
 
     """ Step 7: Clean up """
-    print('---Clean up resources')
+    print('---Clean up resources for {}'.format(name))
     # Delete snapshots and original volume
     snapshot.delete()
     snapshot_encrypted.delete()
@@ -226,5 +228,11 @@ if __name__ == "__main__":
     # Get the list of instance names from the config file.
     names = root_drive_encrypter_config.names
 
-    p = Pool(3)
-    print(p.map(encrypt_root, names))
+    # Make sure there are names in the list and run a process for each.
+    try:
+        if len(names) > 0:
+            p = Pool(len(names))
+            print(p.map(encrypt_root, names))
+    except:
+        return '---Missing names in the configuration file'
+

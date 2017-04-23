@@ -9,7 +9,7 @@ region = "us-east-1"  # for local testing
 # region = "us-west-2"
 
 # Comma delimited array of quoted instance names to encrypt the root drive.
-names = ["CWDJDEA5001","CWDJDEA5011","CWDJDEA5012","CWDJDEA5013","CWDJDEA5014","CWDJDEA5015"]
+names = ["Test1","Test2","ipcapture","LinuxForCoin"]
 
 # Customer Master Key to use if you're not using the default AWS key
 customer_master_key = ""
