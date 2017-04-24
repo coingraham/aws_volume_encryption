@@ -14,21 +14,21 @@ Conditions:
 
 import boto3
 import botocore
-import root_drive_encrypter_config
+import aws_volume_encryption
 from multiprocessing import Pool
 
 
 def encrypt_root(name):
 
     """ Set up AWS Session + Client + Resources + Waiters """
-    profile = root_drive_encrypter_config.profile
+    profile = aws_volume_encryption.profile
 
     # Create custom session
     # print("Using profile {}".format(profile))
     session = boto3.session.Session(profile_name=profile)
 
     # Get CMK
-    customer_master_key = root_drive_encrypter_config.customer_master_key
+    customer_master_key = aws_volume_encryption.customer_master_key
 
     client = session.client("ec2")
     ec2 = session.resource("ec2")
@@ -84,8 +84,8 @@ def encrypt_root(name):
             print("**Volume ({}) is already encrypted on {}**".format(original_root_volume.id, name))
             return "**Volume ({}) is already encrypted on {}**".format(original_root_volume.id, name)
 
-    """ Step 1: Prepare instance """
-    print("---Preparing instance {}".format(name))
+    """ Step 1: Stopping instance """
+    print("---Stopping instance {}".format(name))
     # Save original mappings to persist to new volume
     original_mappings = {"DeleteOnTermination": instance.block_device_mappings[0]["Ebs"]["DeleteOnTermination"]}
 
@@ -235,7 +235,7 @@ def encrypt_root(name):
 if __name__ == "__main__":
 
     # Get the list of instance names from the config file.
-    names = root_drive_encrypter_config.names
+    names = aws_volume_encryption.names
 
     # Make sure there are names in the list and run a process for each.
     if len(names) > 0:
