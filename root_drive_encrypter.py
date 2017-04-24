@@ -239,7 +239,11 @@ if __name__ == "__main__":
 
     # Make sure there are names in the list and run a process for each.
     if len(names) > 0:
-        p = Pool(len(names))
+        if len(names) > 10:
+            max_pool_size = 10
+        else:
+            max_pool_size = len(names)
+        p = Pool(max_pool_size)
         print(p.map(encrypt_root, names))
     else:
         print("---Missing list of instance names in config")
