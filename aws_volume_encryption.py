@@ -14,21 +14,23 @@ Conditions:
 
 import boto3
 import botocore
-import aws_volume_encryption
-from multiprocessing import Pool
-
+import aws_volume_encryption_config
+# from multiprocessing import Pool
 
 def encrypt_root(name):
 
     """ Set up AWS Session + Client + Resources + Waiters """
-    profile = aws_volume_encryption.profile
+    profile = aws_volume_encryption_config.profile
+    region = aws_volume_encryption_config.region
+    original_root_volume = None
+    original_mappings = None
 
     # Create custom session
     # print("Using profile {}".format(profile))
-    session = boto3.session.Session(profile_name=profile)
+    session = boto3.session.Session(profile_name=profile, region_name=region)
 
     # Get CMK
-    customer_master_key = aws_volume_encryption.customer_master_key
+    customer_master_key = aws_volume_encryption_config.customer_master_key
 
     client = session.client("ec2")
     ec2 = session.resource("ec2")
@@ -75,19 +77,32 @@ def encrypt_root(name):
     except botocore.exceptions.WaiterError as e:
         return "ERROR: {} on {}".format(e, name)
 
-    """ Get volume and exit if already encrypted """
-    volumes = [v for v in instance.volumes.all()]
-    if volumes:
-        original_root_volume = volumes[0]
-        volume_encrypted = original_root_volume.encrypted
-        if volume_encrypted:
-            print("**Volume ({}) is already encrypted on {}**".format(original_root_volume.id, name))
-            return "**Volume ({}) is already encrypted on {}**".format(original_root_volume.id, name)
+    # """ Get volume and exit if already encrypted """
+    # volumes = [v for v in instance.volumes.all()]
+    # if volumes:
+    #     original_root_volume = volumes[0]
+    #     volume_encrypted = original_root_volume.encrypted
+    #     if volume_encrypted:
+    #         print("**Volume ({}) is already encrypted on {}**".format(original_root_volume.id, name))
+    #         return "**Volume ({}) is already encrypted on {}**".format(original_root_volume.id, name)
+
+    for v in instance.volumes.all():
+        for attachment in v.attachments:
+            if attachment["Device"] == instance.root_device_name:
+                original_root_volume = v
+                if original_root_volume.encrypted:
+                        print("**Volume ({}) is already encrypted on {}**".format(original_root_volume.id, name))
+                        return "**Volume ({}) is already encrypted on {}**".format(original_root_volume.id, name)
+
+    if not original_root_volume:
+        return("Unable to determine root volume.")
 
     """ Step 1: Stopping instance """
     print("---Stopping instance {}".format(name))
     # Save original mappings to persist to new volume
-    original_mappings = {"DeleteOnTermination": instance.block_device_mappings[0]["Ebs"]["DeleteOnTermination"]}
+    for block_device_mapping in instance.block_device_mappings:
+        if block_device_mapping["DeviceName"] == instance.root_device_name:
+            original_mappings = block_device_mapping["Ebs"]["DeleteOnTermination"]
 
     # Exit if instance is pending, shutting-down, or terminated
     instance_exit_states = [0, 32, 48]
@@ -235,16 +250,21 @@ def encrypt_root(name):
 if __name__ == "__main__":
 
     # Get the list of instance names from the config file.
-    names = aws_volume_encryption.names
+    names = aws_volume_encryption_config.names
 
     # Make sure there are names in the list and run a process for each.
     if len(names) > 0:
-        if len(names) > 10:
-            max_pool_size = 10
-        else:
-            max_pool_size = len(names)
-        p = Pool(max_pool_size)
-        print(p.map(encrypt_root, names))
+        # if len(names) > 10:
+        #     max_pool_size = 10
+        # else:
+        #     max_pool_size = len(names)
+
+        # p = Pool(max_pool_size)
+        # print(p.map(encrypt_root, names))
+
+        for name in names:
+            print(encrypt_root(name))
+
     else:
         print("---Missing list of instance names in config")
 
