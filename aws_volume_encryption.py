@@ -15,7 +15,7 @@ Conditions:
 import boto3
 import botocore
 import aws_volume_encryption_config
-# from multiprocessing import Pool
+from multiprocessing import Pool
 
 def encrypt_root(name):
 
@@ -220,7 +220,7 @@ def encrypt_root(name):
                 "DeviceName": instance.root_device_name,
                 "Ebs": {
                     "DeleteOnTermination":
-                    original_mappings["DeleteOnTermination"],
+                    original_mappings,
                 },
             },
         ],
@@ -254,16 +254,19 @@ if __name__ == "__main__":
 
     # Make sure there are names in the list and run a process for each.
     if len(names) > 0:
-        # if len(names) > 10:
-        #     max_pool_size = 10
-        # else:
-        #     max_pool_size = len(names)
 
-        # p = Pool(max_pool_size)
-        # print(p.map(encrypt_root, names))
+        # Uncomment if you want to run in parallel (up to 10 at a time)
+        if len(names) > 10:
+            max_pool_size = 10
+        else:
+            max_pool_size = len(names)
 
-        for name in names:
-            print(encrypt_root(name))
+        p = Pool(max_pool_size)
+        print(p.map(encrypt_root, names))
+
+        # Uncomment if you want to run them one at a time (good for troubleshooting)
+        # for name in names:
+        #     print(encrypt_root(name))
 
     else:
         print("---Missing list of instance names in config")

@@ -9,7 +9,7 @@ profile = "FSOP_Admin"
 region = "us-west-2"
 
 # Comma delimited array of quoted instance names to encrypt the root drive.
-names = ["CLPJDEA5001","CLPJDEA5002","CLPJDEA5003","CLPJDEA5004","CLPJDED5001","CWPJDEA5001"]
+names = ["CLPJDEA5001","CLPJDEA5002","CLPJDEA5003","CLPJDEA5004"]
 # names = ["Test"]
 
 # Customer Master Key to use if you're not using the default AWS key.  Full ARN.
