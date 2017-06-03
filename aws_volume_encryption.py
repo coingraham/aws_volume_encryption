@@ -255,9 +255,9 @@ if __name__ == "__main__":
     # Make sure there are names in the list and run a process for each.
     if len(names) > 0:
 
-        # Uncomment if you want to run in parallel (up to 10 at a time)
-        if len(names) > 10:
-            max_pool_size = 10
+        # Uncomment if you want to run in parallel (you can only do 5 snaps at a time)
+        if len(names) > 5:
+            max_pool_size = 5
         else:
             max_pool_size = len(names)
 
