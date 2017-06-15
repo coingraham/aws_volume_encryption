@@ -2,6 +2,10 @@
 
 Utility for quickly encrypting the root drives of an array of systems.  
 
+## WARNING
+
+I'm still researching the impact of encrypting the root volume on the product billing metadata.  This could potentially negatively impact marketplace AMIs or licensed OS AMIs like RHEL.
+
 ## Getting Started
 
 Clone the repo, edit the configuration file and run the script.  There are no arguments.
