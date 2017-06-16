@@ -136,6 +136,9 @@ def encrypt_root(name):
         Description="Snapshot of volume ({}) for {}".format(original_root_volume.id, name),
     )
 
+    # Set the max_attempts for this waiter (default 40)
+    waiter_snapshot_complete.config.max_attempts = 120
+
     try:
         waiter_snapshot_complete.wait(
             SnapshotIds=[
@@ -168,6 +171,9 @@ def encrypt_root(name):
         )
 
     snapshot_encrypted = ec2.Snapshot(snapshot_encrypted_dict["SnapshotId"])
+
+    # Set the max_attempts for this waiter (default 40)
+    waiter_snapshot_complete.config.max_attempts = 120
 
     try:
         waiter_snapshot_complete.wait(
