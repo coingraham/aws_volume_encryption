@@ -18,7 +18,7 @@ from multiprocessing import Pool
 class InstanceVolumeEncryptor:
     def __init__(self, instance_name):
 
-        """ Set up AWS Session + Client + Resources + Waiters """
+        # Set up AWS Session + Client + Resources + Waiters
         self.instance_name = instance_name
         self.aws_profile = aws_volume_encryption_config.aws_profile
         self.aws_region = aws_volume_encryption_config.aws_region
@@ -51,6 +51,7 @@ class InstanceVolumeEncryptor:
 
     def encrypt_instance_volumes(self):
 
+        # Get the instance information from the name tag
         self.get_instance_info_from_name()
 
         # Save instance volume mappings and tags to persist to new volume
@@ -66,18 +67,22 @@ class InstanceVolumeEncryptor:
                 "DeviceName": device_name,
             })
 
+        # Iterate through the volumes and decide what to do.
         for v in self.instance_volume_mappings:
             if v["DeviceName"] == self.instance.root_device_name:
                 if v["Volume"].encrypted:
+
                     # If the volume is already encrypted, decide what do to.
                     if self.ignore_encrypted is False and v["Volume"].kms_key_id != self.aws_encryption_key_arn:
                         self.volume_queue.append(v)
 
                 else:
+
                     # If not encrypted, add to queue
                     self.volume_queue.append(v)
 
             elif self.encrypt_all:
+
                 # Inspect non-root volumes to add to the queue
                 if v["Volume"].encrypted:
                     # If the volume is already encrypted, decide what do to.
@@ -85,16 +90,22 @@ class InstanceVolumeEncryptor:
                         self.volume_queue.append(v)
 
                 else:
+
                     # If not encrypted, add to queue
                     self.volume_queue.append(v)
 
         if len(self.volume_queue) > 0:
+
+            # If there are any volumes to action against, stop the instance.
             self.stop_instance()
+
             for volume in self.volume_queue:
                 self.process_volume(volume["Volume"], volume["DeviceName"], volume["DeleteOnTermination"])
 
+            # Once all the volumes are done being manipulated, start the system back.
             self.start_instance()
 
+            # Print out the new volume information
             if self.generate_report:
                 # Print a report of the new mappings
                 print("\n---New volume mappings for {}".format(self.instance_name))
@@ -109,7 +120,10 @@ class InstanceVolumeEncryptor:
         print("\n****Encryption finished for {}".format(self.instance_name))
 
     def process_volume(self, volume, device_name, delete_on_termination):
+
         print("\n---Processing volume ({}) attached to {} on {}".format(volume.id, device_name, self.instance_name))
+
+        # Take a snapshot and wait until it's complete.
         print("---Create snapshot of volume ({}) for {}".format(volume.id, self.instance_name))
 
         snapshot = self.ec2_resource.create_snapshot(
@@ -130,7 +144,7 @@ class InstanceVolumeEncryptor:
             snapshot.delete()
             return "ERROR: {} on {}".format(e, self.instance_name)
 
-        """ Step 3: Create encrypted volume """
+        # Copy the snapshot and encrypt it.
         print("---Create encrypted copy of snapshot for ({})".format(volume.id))
 
         if self.aws_encryption_key_arn:
@@ -151,6 +165,7 @@ class InstanceVolumeEncryptor:
                 Encrypted=True,
             )
 
+        # Get the snapshot object from the copy response and wait.
         snapshot_encrypted = self.ec2_resource.Snapshot(snapshot_encrypted_dict["SnapshotId"])
 
         # Set the max_attempts for this waiter (default 40)
@@ -167,6 +182,7 @@ class InstanceVolumeEncryptor:
             snapshot_encrypted.delete()
             return "ERROR: {} on {}".format(e, self.instance_name)
 
+        # Create a new volume from the encrypted snapshot and wait.
         print("---Create encrypted volume from snapshot for ({})".format(volume.id))
 
         if self.force_volume_type is not volume.volume_type:
@@ -193,8 +209,10 @@ class InstanceVolumeEncryptor:
             volume_encrypted.delete()
             return "ERROR: {} on {}".format(e, self.instance_name)
 
+        # Update the tags to match the old tags
         volume_encrypted.create_tags(Tags=volume.tags)
 
+        # Switch the original volume for the new volume.
         print("---Detach volume ({}) for {}".format(volume.id, self.instance_name))
         self.instance.detach_volume(
             VolumeId=volume.id,
@@ -221,7 +239,7 @@ class InstanceVolumeEncryptor:
             Device=device_name
         )
 
-        # Modify instance attributes
+        # Modify instance volume attributes to match the original.
         self.instance.modify_attribute(
             BlockDeviceMappings=[
                 {
@@ -233,8 +251,10 @@ class InstanceVolumeEncryptor:
             ],
         )
 
-        print("---Clean up resources for ({})".format(volume.id))
         # Delete snapshots and original volume
+        # TODO: Need to move this to a separate function that gets called on exception
+
+        print("---Clean up resources for ({})".format(volume.id))
         snapshot.delete()
         snapshot_encrypted.delete()
         volume.delete()
@@ -242,6 +262,7 @@ class InstanceVolumeEncryptor:
         print("---Encryption finished for ({})".format(volume.id))
 
     def stop_instance(self):
+
         # Exit if instance is pending, shutting-down, or terminated
         instance_exit_states = [0, 32, 48]
         if self.instance.state["Code"] in instance_exit_states:
@@ -267,6 +288,8 @@ class InstanceVolumeEncryptor:
             raise "ERROR: {} on {}".format(e, self.instance_name)
 
     def start_instance(self):
+
+        # Start the instance and wait until it's running
         print("---Restart instance {}".format(self.instance_name))
         self.instance.start()
 
@@ -281,11 +304,13 @@ class InstanceVolumeEncryptor:
 
     def get_instance_info_from_name(self):
 
+        # Setup the filter for getting the instance
         name_filter = [{
             "Name": "tag:Name",
             "Values": [self.instance_name]
         }]
 
+        # Get the reservations for the name tag and get the instance id from the reservations
         try:
             reservations = self.ec2_client.describe_instances(Filters=name_filter)
 
@@ -303,6 +328,7 @@ class InstanceVolumeEncryptor:
         except:
             raise "ERROR: Check instance_name {}".format(self.instance_name)
 
+        # Get the instance object from the instance id and wait.
         print("****Checking instance ({}) called {}".format(self.instance_id, self.instance_name))
         self.instance = self.ec2_resource.Instance(self.instance_id)
 
@@ -318,7 +344,7 @@ class InstanceVolumeEncryptor:
 
 def worker(name):
 
-    # Each worker creates a VolumeEncryption obj
+    # Each worker creates a VolumeEncryption obj and runs the utility.
     ve = InstanceVolumeEncryptor(name)
     ve.encrypt_instance_volumes()
 
