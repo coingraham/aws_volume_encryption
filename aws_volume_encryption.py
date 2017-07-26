@@ -266,10 +266,10 @@ class InstanceVolumeEncryptor:
         # Exit if instance is pending, shutting-down, or terminated
         instance_exit_states = [0, 32, 48]
         if self.instance.state["Code"] in instance_exit_states:
-            raise "ERROR: Instance is {} please make sure this instance ({}) is active.".format(
+            raise Exception("ERROR: Instance is {} please make sure this instance ({}) is active.".format(
                 self.instance.state["Name"],
                 self.instance_name
-            )
+            ))
 
         # Validate successful shutdown if it is running or stopping
         if self.instance.state["Code"] is 16:
@@ -285,7 +285,7 @@ class InstanceVolumeEncryptor:
                 ]
             )
         except botocore.exceptions.WaiterError as e:
-            raise "ERROR: {} on {}".format(e, self.instance_name)
+            raise Exception("ERROR: {} on {}".format(e, self.instance_name))
 
     def start_instance(self):
 
@@ -300,7 +300,7 @@ class InstanceVolumeEncryptor:
                 ]
             )
         except botocore.exceptions.WaiterError as e:
-            raise "ERROR: {} on {}".format(e, self.instance_name)
+            raise Exception("ERROR: {} on {}".format(e, self.instance_name))
 
     def get_instance_info_from_name(self):
 
@@ -323,10 +323,10 @@ class InstanceVolumeEncryptor:
                         self.instance_id = _instance[u"InstanceId"]
 
             else:
-                raise "ERROR: Ambiguous instance_name {}".format(self.instance_name)
+                raise Exception("ERROR: Ambiguous instance_name {}".format(self.instance_name))
 
         except:
-            raise "ERROR: Check instance_name {}".format(self.instance_name)
+            raise Exception("ERROR: Check instance_name {}".format(self.instance_name))
 
         # Get the instance object from the instance id and wait.
         print("****Checking instance ({}) called {}".format(self.instance_id, self.instance_name))
