@@ -209,8 +209,9 @@ class InstanceVolumeEncryptor:
             volume_encrypted.delete()
             return "ERROR: {} on {}".format(e, self.instance_name)
 
-        # Update the tags to match the old tags
-        volume_encrypted.create_tags(Tags=volume.tags)
+        # Update the tags to match the old tags if they exist
+        if volume.tags:
+            volume_encrypted.create_tags(Tags=volume.tags)
 
         # Switch the original volume for the new volume.
         print("---Detach volume ({}) for {}".format(volume.id, self.instance_name))
