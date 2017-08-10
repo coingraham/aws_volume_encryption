@@ -14,7 +14,7 @@ instance_names = ["UpdateMe"]
 # AWS encryption key ARN to use if you're not using the default AWS key.  Full ARN.
 # If you want to use the default AWS\ebs key, just leave blank
 # aws_encryption_key_arn = ""
-aws_encryption_key_arn = "arn:aws:kms:us-east-1:955241386426:key/788db8b3-1e19-4af2-bf43-2cbe3cfbc985"
+aws_encryption_key_arn = ""
 
 # NEW OPTIONS
 # encrypt_all: set to true if you want to encrypt all volumes instead of just root.
