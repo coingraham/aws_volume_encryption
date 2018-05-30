@@ -14,7 +14,7 @@ import botocore
 import botocore.exceptions as exceptions
 import argparse
 import aws_volume_encryption_config
-# from multiprocessing import Pool
+from multiprocessing import Pool
 
 
 class InstanceVolumeEncryptor:
@@ -62,7 +62,6 @@ class InstanceVolumeEncryptor:
         else:
             self.aws_encryption_key_arn = ""
 
-
         # Pre-create the clients for reuse
         self.ec2_client = self.session.client("ec2")
         self.ec2_resource = self.session.resource("ec2")
@@ -83,7 +82,7 @@ class InstanceVolumeEncryptor:
             self.get_instance_info_from_name()
         else:
 
-            print("****Checking instance ({}).".format(self.instance_identification))
+            print("****Checking instance {}.".format(self.instance_identification))
             self.instance = self.ec2_resource.Instance(self.instance_id)
 
             try:
@@ -94,7 +93,7 @@ class InstanceVolumeEncryptor:
                 )
             except botocore.exceptions.WaiterError as e:
                 if "Max attempts exceeded" in e.message:
-                    return "****Instance ({}) not found in {}.".format(self.instance_identification, self.aws_region)
+                    return "****Instance {} not found in {}.".format(self.instance_identification, self.aws_region)
                 else:
                     return "ERROR: {} on {}".format(e, self.instance_identification)
 
@@ -165,15 +164,15 @@ class InstanceVolumeEncryptor:
 
     def process_volume(self, volume, device_name, delete_on_termination):
 
-        print("\n---Processing volume ({}) attached to {} on {}".format(volume.id, device_name,
+        print("\n---Processing volume {} attached to {} on {}".format(volume.id, device_name,
                                                                         self.instance_identification))
 
         # Take a snapshot and wait until it's complete.
-        print("---Create snapshot of volume ({}) for {}".format(volume.id, self.instance_identification))
+        print("---Create snapshot of volume {} for {}".format(volume.id, self.instance_identification))
 
         snapshot = self.ec2_resource.create_snapshot(
             VolumeId=volume.id,
-            Description="Snapshot of volume ({}) for {}".format(volume.id, self.instance_identification),
+            Description="Snapshot of volume {} for {}".format(volume.id, self.instance_identification),
         )
 
         # Set the max_attempts for this waiter (default 40)
@@ -190,13 +189,13 @@ class InstanceVolumeEncryptor:
             return "ERROR: {} on {}".format(e, self.instance_identification)
 
         # Copy the snapshot and encrypt it.
-        print("---Create encrypted copy of snapshot for ({})".format(volume.id))
+        print("---Create encrypted copy of snapshot for {}".format(volume.id))
 
         if self.aws_encryption_key_arn:
             # Use custom key
             snapshot_encrypted_dict = snapshot.copy(
                 SourceRegion=self.session.region_name,
-                Description="Encrypted copy of snapshot ({}) for {}"
+                Description="Encrypted copy of snapshot {} for {}"
                             .format(snapshot.id, self.instance_identification),
                 KmsKeyId=self.aws_encryption_key_arn,
                 Encrypted=True,
@@ -205,7 +204,7 @@ class InstanceVolumeEncryptor:
             # Use default key
             snapshot_encrypted_dict = snapshot.copy(
                 SourceRegion=self.session.region_name,
-                Description="Encrypted copy of snapshot ({}) for {}"
+                Description="Encrypted copy of snapshot {} for {}"
                             .format(snapshot.id, self.instance_identification),
                 Encrypted=True,
             )
@@ -228,7 +227,7 @@ class InstanceVolumeEncryptor:
             return "ERROR: {} on {}".format(e, self.instance_identification)
 
         # Create a new volume from the encrypted snapshot and wait.
-        print("---Create encrypted volume from snapshot for ({})".format(volume.id))
+        print("---Create encrypted volume from snapshot for {}".format(volume.id))
 
         if self.force_volume_type is not volume.volume_type:
             update_volume_type = self.force_volume_type
@@ -259,7 +258,7 @@ class InstanceVolumeEncryptor:
             volume_encrypted.create_tags(Tags=volume.tags)
 
         # Switch the original volume for the new volume.
-        print("---Detach volume ({}) for {}".format(volume.id, self.instance_identification))
+        print("---Detach volume {} for {}".format(volume.id, self.instance_identification))
         self.instance.detach_volume(
             VolumeId=volume.id,
             Device=device_name,
@@ -278,7 +277,7 @@ class InstanceVolumeEncryptor:
             volume_encrypted.delete()
             return "ERROR: {} on {}".format(e, self.instance_identification)
 
-        print("---Attach volume ({}) for {}".format(volume_encrypted.id, self.instance_identification))
+        print("---Attach volume {} for {}".format(volume_encrypted.id, self.instance_identification))
 
         self.instance.attach_volume(
             VolumeId=volume_encrypted.id,
@@ -300,12 +299,12 @@ class InstanceVolumeEncryptor:
         # Delete snapshots and original volume
         # TODO: Need to move this to a separate function that gets called on exception
 
-        print("---Clean up resources for ({})".format(volume.id))
+        print("---Clean up resources for {}".format(volume.id))
         snapshot.delete()
         snapshot_encrypted.delete()
         volume.delete()
 
-        print("---Encryption finished for ({})".format(volume.id))
+        print("---Encryption finished for {}".format(volume.id))
 
     def stop_instance(self):
 
@@ -314,7 +313,7 @@ class InstanceVolumeEncryptor:
         # Exit if instance is pending, shutting-down, or terminated
         instance_exit_states = [0, 32, 48]
         if self.instance.state["Code"] in instance_exit_states:
-            raise Exception("ERROR: Instance is {} please make sure this instance ({}) is active.".format(
+            raise Exception("ERROR: Instance is {} please make sure this instance {} is active.".format(
                 self.instance.state["Name"],
                 self.instance_name
             ))
@@ -378,7 +377,7 @@ class InstanceVolumeEncryptor:
                 self.instance_identification, e))
 
         # Get the instance object from the instance id and wait.
-        print("****Checking instance ({}) called {}".format(self.instance_id, self.instance_identification))
+        print("****Checking instance {} called {}".format(self.instance_id, self.instance_identification))
         self.instance = self.ec2_resource.Instance(self.instance_id)
 
         try:
@@ -391,18 +390,46 @@ class InstanceVolumeEncryptor:
             return "ERROR: {} on {}".format(e, self.instance_identification)
 
 
-# def worker(instance_name):
-#
-#     # Each worker creates a VolumeEncryption obj and runs the utility.
-#     ve = InstanceVolumeEncryptor(_profile=profile,
-#                                  _region=region,
-#                                  _encrypt_all=encrypt_all,
-#                                  _ignore_encrypted=ignore_encrypted,
-#                                  _generate_report=generate_report,
-#                                  _force_volume_type=force_volume_type,
-#                                  _instance_id=instance_id,
-#                                  _instance_name=instance_name)
-#     ve.encrypt_instance_volumes()
+class Worker:
+
+    def __init__(self,
+                 _profile,
+                 _region,
+                 _encrypt_all,
+                 _ignore_encrypted,
+                 _generate_report,
+                 _force_volume_type,
+                 _encryption_key_arn,
+                 _instance_unknown):
+
+        if "i-" in _instance_unknown:
+            self.instance_id = _instance_unknown
+            self.instance_name = None
+        else:
+            self.instance_name = _instance_unknown
+            self.instance_id = None
+
+        self.profile = _profile
+        self.region = _region
+        self.encrypt_all = _encrypt_all
+        self.ignore_encrypted = _ignore_encrypted
+        self.generate_report = _generate_report
+        self.force_volume_type = _force_volume_type
+        self.encryption_key_arn = _encryption_key_arn
+
+
+def run(worker):
+
+    # Each worker creates a VolumeEncryption obj and runs the utility.
+    worker_ve = InstanceVolumeEncryptor(_profile=worker.profile,
+                                        _region=worker.region,
+                                        _encrypt_all=worker.encrypt_all,
+                                        _ignore_encrypted=worker.ignore_encrypted,
+                                        _generate_report=worker.generate_report,
+                                        _force_volume_type=worker.force_volume_type,
+                                        _instance_id=worker.instance_id,
+                                        _instance_name=worker.instance_name)
+    worker_ve.encrypt_instance_volumes()
 
 
 if __name__ == "__main__":
@@ -444,50 +471,69 @@ if __name__ == "__main__":
                         default=aws_volume_encryption_config.instance_names,
                         help="Instance Names that you want to encrypt.")
 
+    parser.add_argument('--use_pool', action='store_true',
+                        help="Will attempt to run multiple jobs in parallel.")
+
     args = parser.parse_args()
 
-    if args.instance_ids_list:
-        for instance_id in args.instance_ids_list:
-            ve = InstanceVolumeEncryptor(_profile=args.profile,
-                                         _region=args.region,
-                                         _encrypt_all=args.encrypt_all,
-                                         _ignore_encrypted=args.ignore_encrypted,
-                                         _generate_report=args.generate_report,
-                                         _force_volume_type=args.force_volume_type,
-                                         _instance_id=instance_id,
-                                         _encryption_key_arn=args.encryption_key_arn,
-                                         _instance_name=None)
-            print(ve.encrypt_instance_volumes())
+    if not args.use_pool:
 
-    if args.instance_names_list:
-        for instance_name in args.instance_names_list:
-            ve = InstanceVolumeEncryptor(_profile=args.profile,
-                                         _region=args.region,
-                                         _encrypt_all=args.encrypt_all,
-                                         _ignore_encrypted=args.ignore_encrypted,
-                                         _generate_report=args.generate_report,
-                                         _force_volume_type=args.force_volume_type,
-                                         _encryption_key_arn=args.encryption_key_arn,
-                                         _instance_id=None,
-                                         _instance_name=instance_name)
-            print(ve.encrypt_instance_volumes())
+        if args.instance_ids_list:
+            for instance_id in args.instance_ids_list:
+                ve = InstanceVolumeEncryptor(_profile=args.profile,
+                                             _region=args.region,
+                                             _encrypt_all=args.encrypt_all,
+                                             _ignore_encrypted=args.ignore_encrypted,
+                                             _generate_report=args.generate_report,
+                                             _force_volume_type=args.force_volume_type,
+                                             _instance_id=instance_id,
+                                             _encryption_key_arn=args.encryption_key_arn,
+                                             _instance_name=None)
+                print(ve.encrypt_instance_volumes())
 
-    # Multiprocessing version currently disabled
-    # # Get the list of instance names from the config file.
-    # instance_names = aws_volume_encryption_config.instance_names
+        if args.instance_names_list:
+            for instance_name in args.instance_names_list:
+                ve = InstanceVolumeEncryptor(_profile=args.profile,
+                                             _region=args.region,
+                                             _encrypt_all=args.encrypt_all,
+                                             _ignore_encrypted=args.ignore_encrypted,
+                                             _generate_report=args.generate_report,
+                                             _force_volume_type=args.force_volume_type,
+                                             _encryption_key_arn=args.encryption_key_arn,
+                                             _instance_id=None,
+                                             _instance_name=instance_name)
+                print(ve.encrypt_instance_volumes())
 
-    # # Make sure there are names in the list and run a process for each.
-    # if len(instance_names) > 0:
-    #
-    #     # Uncomment if you want to run in parallel (you can only do 5 snaps at a time)
-    #     if len(instance_names) > 5:
-    #         max_pool_size = 5
-    #     else:
-    #         max_pool_size = len(instance_names)
-    #
-    #     # Instantiate the tool
-    #     p = Pool(max_pool_size)
-    #     p.map(worker, instance_names)
-    # 
-    # else:
-    #     print("---Missing list of instance names in config")
+    else:
+
+        # Get master list to work off of.
+        master_list = args.instance_ids_list + args.instance_names_list
+        worker_list = []
+
+        # Make sure there are names in the list and run a process for each.
+        if len(master_list) > 0:
+
+            # Create worker objects with all the settings in place
+            for item in master_list:
+                worker_list.append(Worker(_profile=args.profile,
+                                          _region=args.region,
+                                          _encrypt_all=args.encrypt_all,
+                                          _ignore_encrypted=args.ignore_encrypted,
+                                          _generate_report=args.generate_report,
+                                          _force_volume_type=args.force_volume_type,
+                                          _encryption_key_arn=args.encryption_key_arn,
+                                          _instance_unknown=item
+                                          ))
+
+            # Setting the max pool size to 5 (you can only do 5 snaps at a time)
+            if len(master_list) > 5:
+                max_pool_size = 5
+            else:
+                max_pool_size = len(master_list)
+
+            # Instantiate the tool
+            p = Pool(max_pool_size)
+            p.map(run, worker_list)
+
+        else:
+            print("---Missing list of instance names in config")
