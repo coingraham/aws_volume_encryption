@@ -25,7 +25,8 @@ class InstanceVolumeEncryptor:
                  _instance_id=None,
                  _encrypt_all=False,
                  _ignore_encrypted=True,
-                 _force_volume_type="gp2"
+                 _force_volume_type="gp2",
+                 _encryption_key_arn=None
                  ):
 
         # Set up AWS Session + Client + Resources + Waiters
@@ -56,7 +57,11 @@ class InstanceVolumeEncryptor:
         self.session = boto3.session.Session(profile_name=self.aws_profile, region_name=self.aws_region)
 
         # Get CMK
-        self.aws_encryption_key_arn = aws_volume_encryption_config.aws_encryption_key_arn
+        if _encryption_key_arn is not None:
+            self.aws_encryption_key_arn = _encryption_key_arn
+        else:
+            self.aws_encryption_key_arn = ""
+
 
         # Pre-create the clients for reuse
         self.ec2_client = self.session.client("ec2")
@@ -403,14 +408,41 @@ class InstanceVolumeEncryptor:
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description='aws_volume_encryption')
-    parser.add_argument('--profile', default=aws_volume_encryption_config.aws_profile)
-    parser.add_argument('--region', default=aws_volume_encryption_config.aws_region)
-    parser.add_argument('--encrypt_all', default=aws_volume_encryption_config.encrypt_all)
-    parser.add_argument('--ignore_encrypted', default=aws_volume_encryption_config.ignore_encrypted)
-    parser.add_argument('--generate_report', default=aws_volume_encryption_config.generate_report)
-    parser.add_argument('--force_volume_type', default=aws_volume_encryption_config.force_volume_type)
-    parser.add_argument('--instance_ids_list', nargs='*', default=aws_volume_encryption_config.instance_ids)
-    parser.add_argument('--instance_names_list', nargs='*', default=aws_volume_encryption_config.instance_names)
+    parser.add_argument('--profile',
+                        default=aws_volume_encryption_config.aws_profile,
+                        help="The aws profile you want to use.")
+
+    parser.add_argument('--region',
+                        default=aws_volume_encryption_config.aws_region,
+                        help="The aws region you want to work in.")
+
+    parser.add_argument('--encrypt_all', choices=[True, False],
+                        default=aws_volume_encryption_config.encrypt_all,
+                        help="True to encrypt all the disks on the instance.  False will encrypt just the root disk.")
+
+    parser.add_argument('--ignore_encrypted', choices=[True, False],
+                        default=aws_volume_encryption_config.ignore_encrypted,
+                        help="True will ignore disks that are already encrypted.  False will re-encrypt them.")
+
+    parser.add_argument('--generate_report', choices=[True, False],
+                        default=aws_volume_encryption_config.generate_report,
+                        help="True will generate a report at the end.")
+
+    parser.add_argument('--encryption_key_arn',
+                        default=aws_volume_encryption_config.encryption_key_arn,
+                        help="If you put an encryption key arn here, all disks will be encrypted with that key.")
+
+    parser.add_argument('--force_volume_type',
+                        default=aws_volume_encryption_config.force_volume_type,
+                        help="If you put a disk type here, all disks will be created with this type.  Default is GP2.")
+
+    parser.add_argument('--instance_ids_list', nargs='*',
+                        default=aws_volume_encryption_config.instance_ids,
+                        help="Instance Ids that you want to encrypt.")
+
+    parser.add_argument('--instance_names_list', nargs='*',
+                        default=aws_volume_encryption_config.instance_names,
+                        help="Instance Names that you want to encrypt.")
 
     args = parser.parse_args()
 
@@ -423,6 +455,7 @@ if __name__ == "__main__":
                                          _generate_report=args.generate_report,
                                          _force_volume_type=args.force_volume_type,
                                          _instance_id=instance_id,
+                                         _encryption_key_arn=args.encryption_key_arn,
                                          _instance_name=None)
             print(ve.encrypt_instance_volumes())
 
@@ -434,6 +467,7 @@ if __name__ == "__main__":
                                          _ignore_encrypted=args.ignore_encrypted,
                                          _generate_report=args.generate_report,
                                          _force_volume_type=args.force_volume_type,
+                                         _encryption_key_arn=args.encryption_key_arn,
                                          _instance_id=None,
                                          _instance_name=instance_name)
             print(ve.encrypt_instance_volumes())
