@@ -2,14 +2,17 @@
 
 # AWS profile you are referencing for authentication.  If you don't have a profile set to "default"
 # aws_profile = "default"
-aws_profile = "firstwatch"
+aws_profile = ""
 
 # AWS region you want to run in.
-aws_region = "us-east-1"  # for local testing
+aws_region = ""  # for local testing
 # aws_region = "us-west-2"
 
+# Comma delimited array of quoted instance ids to encrypt the volumes for.
+instance_ids = []
+
 # Comma delimited array of quoted instance names to encrypt the volumes for.
-instance_names = ["UpdateMe"]
+instance_names = []
 
 # AWS encryption key ARN to use if you're not using the default AWS key.  Full ARN.
 # If you want to use the default AWS\ebs key, just leave blank
