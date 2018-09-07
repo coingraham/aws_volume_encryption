@@ -26,7 +26,8 @@ class InstanceVolumeEncryptor:
                  _encrypt_all=False,
                  _ignore_encrypted=True,
                  _force_volume_type="gp2",
-                 _encryption_key_arn=None
+                 _encryption_key_arn=None,
+                 _keep_snapshots=False
                  ):
 
         # Set up AWS Session + Client + Resources + Waiters
@@ -36,6 +37,7 @@ class InstanceVolumeEncryptor:
         self.ignore_encrypted = _ignore_encrypted
         self.generate_report = _generate_report
         self.force_volume_type = _force_volume_type
+        self.keep_snapshots = _keep_snapshots
         self.instance = None
         self.volume_queue = []
 
@@ -300,9 +302,15 @@ class InstanceVolumeEncryptor:
         # TODO: Need to move this to a separate function that gets called on exception
 
         print("---Clean up resources for {}".format(volume.id))
-        snapshot.delete()
-        snapshot_encrypted.delete()
-        volume.delete()
+
+        if self.keep_snapshots:
+            print("---Keeping snapshot {} per the configuration.".format(snapshot.id))
+            snapshot_encrypted.delete()
+            volume.delete()
+        else:
+            snapshot.delete()
+            snapshot_encrypted.delete()
+            volume.delete()
 
         print("---Encryption finished for {}".format(volume.id))
 
@@ -451,6 +459,11 @@ if __name__ == "__main__":
                         default=aws_volume_encryption_config.ignore_encrypted,
                         help="True will ignore disks that are already encrypted.  False will re-encrypt them.")
 
+    parser.add_argument('--keep_snapshots', choices=[True, False],
+                        default=aws_volume_encryption_config.keep_snapshots,
+                        help="True will keep the snapshots after the new disks are created (you will need to clean them"
+                             " up).  False will delete them.")
+
     parser.add_argument('--generate_report', choices=[True, False],
                         default=aws_volume_encryption_config.generate_report,
                         help="True will generate a report at the end.")
@@ -488,6 +501,7 @@ if __name__ == "__main__":
                                              _force_volume_type=args.force_volume_type,
                                              _instance_id=instance_id,
                                              _encryption_key_arn=args.encryption_key_arn,
+                                             _keep_snapshots=args.keep_snapshots,
                                              _instance_name=None)
                 print(ve.encrypt_instance_volumes())
 
@@ -500,6 +514,7 @@ if __name__ == "__main__":
                                              _generate_report=args.generate_report,
                                              _force_volume_type=args.force_volume_type,
                                              _encryption_key_arn=args.encryption_key_arn,
+                                             _keep_snapshots=args.keep_snapshots,
                                              _instance_id=None,
                                              _instance_name=instance_name)
                 print(ve.encrypt_instance_volumes())
@@ -522,6 +537,7 @@ if __name__ == "__main__":
                                           _generate_report=args.generate_report,
                                           _force_volume_type=args.force_volume_type,
                                           _encryption_key_arn=args.encryption_key_arn,
+                                          _keep_snapshots=args.keep_snapshots,
                                           _instance_unknown=item
                                           ))
 
