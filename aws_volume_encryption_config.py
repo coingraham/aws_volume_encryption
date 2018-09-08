@@ -16,7 +16,7 @@ instance_names = []
 
 # AWS encryption key ARN to use if you're not using the default AWS key.  Full ARN.
 # If you want to use the default AWS\ebs key, just leave blank
-# aws_encryption_key_arn = ""
+# encryption_key_arn = ""
 encryption_key_arn = ""
 
 # NEW OPTIONS
