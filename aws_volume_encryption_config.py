@@ -16,7 +16,7 @@ instance_names = []
 
 # AWS encryption key ARN to use if you're not using the default AWS key.  Full ARN.
 # If you want to use the default AWS\ebs key, just leave blank
-# aws_encryption_key_arn = ""
+# encryption_key_arn = ""
 encryption_key_arn = ""
 
 # NEW OPTIONS
@@ -29,6 +29,12 @@ encrypt_all = False
 # -- Set to false to re-encrypt volumes if the configuration key doesn't match the current encryption key.
 # ignore_encrypted = True
 ignore_encrypted = False
+
+# keep_snapshots:
+# -- Set to true to keep the snapshots used to create the new encrypted disk.  You will need to clean them up manually.
+# -- Set to false to delete the unneeded snapshots when complete.
+# keep_snapshots = True
+keep_snapshots = False
 
 # generate_report: will generate some information helpful for updating terraform state files or other documentation
 generate_report = True
