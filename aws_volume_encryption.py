@@ -17,8 +17,9 @@ import aws_volume_encryption_config
 from multiprocessing import Pool
 
 
-class InstanceVolumeEncryptor:
-    def __init__(self, _profile,
+class InstanceVolumeEncrypter:
+    def __init__(self,
+                 _profile,
                  _region="us-east-1",
                  _generate_report=True,
                  _instance_name=None,
@@ -429,7 +430,7 @@ class Worker:
 def run(worker):
 
     # Each worker creates a VolumeEncryption obj and runs the utility.
-    worker_ve = InstanceVolumeEncryptor(_profile=worker.profile,
+    worker_ve = InstanceVolumeEncrypter(_profile=worker.profile,
                                         _region=worker.region,
                                         _encrypt_all=worker.encrypt_all,
                                         _ignore_encrypted=worker.ignore_encrypted,
@@ -493,7 +494,7 @@ if __name__ == "__main__":
 
         if args.instance_ids_list:
             for instance_id in args.instance_ids_list:
-                ve = InstanceVolumeEncryptor(_profile=args.profile,
+                ve = InstanceVolumeEncrypter(_profile=args.profile,
                                              _region=args.region,
                                              _encrypt_all=args.encrypt_all,
                                              _ignore_encrypted=args.ignore_encrypted,
@@ -507,7 +508,7 @@ if __name__ == "__main__":
 
         if args.instance_names_list:
             for instance_name in args.instance_names_list:
-                ve = InstanceVolumeEncryptor(_profile=args.profile,
+                ve = InstanceVolumeEncrypter(_profile=args.profile,
                                              _region=args.region,
                                              _encrypt_all=args.encrypt_all,
                                              _ignore_encrypted=args.ignore_encrypted,
