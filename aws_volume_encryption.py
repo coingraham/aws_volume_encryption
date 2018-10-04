@@ -409,6 +409,7 @@ class Worker:
                  _generate_report,
                  _force_volume_type,
                  _encryption_key_arn,
+                 _keep_snapshots,
                  _instance_unknown):
 
         if "i-" in _instance_unknown:
@@ -425,6 +426,7 @@ class Worker:
         self.generate_report = _generate_report
         self.force_volume_type = _force_volume_type
         self.encryption_key_arn = _encryption_key_arn
+        self.keep_snapshots = _keep_snapshots
 
 
 def run(worker):
@@ -436,6 +438,8 @@ def run(worker):
                                         _ignore_encrypted=worker.ignore_encrypted,
                                         _generate_report=worker.generate_report,
                                         _force_volume_type=worker.force_volume_type,
+                                        _encryption_key_arn=worker.encryption_key_arn,
+                                        _keep_snapshots=worker.keep_snapshots,
                                         _instance_id=worker.instance_id,
                                         _instance_name=worker.instance_name)
     worker_ve.encrypt_instance_volumes()
