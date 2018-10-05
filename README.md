@@ -36,6 +36,6 @@ This project is licensed under the MIT License - see the [LICENSE.md](LICENSE.md
 
 ## Acknowledgments
 
-* Forked from [dwbelliston](https://github.com/dwbelliston/aws_volume_encryption) and updated for mass encryption of systems.
+* Forked from [dwbelliston](https://github.com/dwbelliston/aws_volume_encryption) and applied some major updates around encryption, tagging and disk types.
 
 
